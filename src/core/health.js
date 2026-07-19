@@ -197,6 +197,22 @@ export async function launch({ port, kill_existing } = {}) {
     } catch { /* ignore */ }
   }
 
+  // TradingView installed from the Microsoft Store ships as a full-trust
+  // packaged app under WindowsApps with a version-hashed directory name,
+  // so it can't be matched by a static path.
+  if (!tvPath && platform === 'win32') {
+    try {
+      const installLocation = execSync(
+        'powershell -NoProfile -Command "(Get-AppxPackage -Name \'*TradingView*\').InstallLocation"',
+        { timeout: 5000 }
+      ).toString().trim();
+      if (installLocation) {
+        const candidate = `${installLocation}\\TradingView.exe`;
+        if (existsSync(candidate)) tvPath = candidate;
+      }
+    } catch { /* ignore */ }
+  }
+
   if (!tvPath && platform === 'darwin') {
     try {
       const found = execSync('mdfind "kMDItemFSName == TradingView.app" | head -1', { timeout: 5000 }).toString().trim();
