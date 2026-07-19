@@ -38,6 +38,23 @@ export async function setInputs({ entity_id, inputs: inputsRaw }) {
   return { success: true, entity_id, updated_inputs: result.updated_inputs };
 }
 
+export async function isVisible({ entity_id }) {
+  if (!entity_id) throw new Error('entity_id is required. Use chart_get_state to find study IDs.');
+
+  const escapedId = entity_id.replace(/'/g, "\\'");
+  const result = await evaluate(`
+    (function() {
+      var chart = ${CHART_API};
+      var study = chart.getStudyById('${escapedId}');
+      if (!study) return { error: 'Study not found: ${escapedId}' };
+      return { visible: study.isVisible() };
+    })()
+  `);
+
+  if (result && result.error) throw new Error(result.error);
+  return result.visible;
+}
+
 export async function toggleVisibility({ entity_id, visible }) {
   if (!entity_id) throw new Error('entity_id is required. Use chart_get_state to find study IDs.');
   if (typeof visible !== 'boolean') throw new Error('visible must be a boolean (true or false)');

@@ -9,10 +9,12 @@ import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as chart from "./chart.js";
 import * as data from "./data.js";
+import * as indicators from "./indicators.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = resolve(__dirname, "../../");
 const SESSIONS_DIR = join(homedir(), ".tradingview-mcp", "sessions");
+const DEFAULT_DASHBOARD_FILTER = "Apex Predator";
 
 function loadRules(rulesPath) {
   const candidates = [
@@ -43,7 +45,12 @@ function loadRules(rulesPath) {
 
 export async function runBrief({ rules_path } = {}) {
   const { rules, path: loadedFrom } = loadRules(rules_path);
-  const { watchlist = [], default_timeframe = "240" } = rules;
+  const {
+    watchlist = [],
+    default_timeframe = "240",
+    dashboard_study_filter,
+  } = rules;
+  const dashboardFilter = dashboard_study_filter || DEFAULT_DASHBOARD_FILTER;
 
   if (!watchlist.length) {
     throw new Error(
@@ -53,10 +60,27 @@ export async function runBrief({ rules_path } = {}) {
 
   // Save current chart state so we can restore after scanning
   let originalSymbol, originalTimeframe;
+  let dashboardEntityId, dashboardWasVisible;
   try {
     const currentState = await chart.getState();
     originalSymbol = currentState.symbol;
     originalTimeframe = currentState.resolution;
+
+    const match = (currentState.studies || []).find((s) =>
+      s.name.toLowerCase().includes(dashboardFilter.toLowerCase()),
+    );
+    if (match) {
+      dashboardEntityId = match.id;
+      dashboardWasVisible = await indicators.isVisible({
+        entity_id: dashboardEntityId,
+      });
+      if (!dashboardWasVisible) {
+        await indicators.toggleVisibility({
+          entity_id: dashboardEntityId,
+          visible: true,
+        });
+      }
+    }
   } catch (_) {}
 
   const results = [];
@@ -66,20 +90,24 @@ export async function runBrief({ rules_path } = {}) {
       await chart.setSymbol({ symbol });
       await new Promise((r) => setTimeout(r, 900));
       await chart.setTimeframe({ timeframe: default_timeframe });
-      await new Promise((r) => setTimeout(r, 900));
+      await new Promise((r) => setTimeout(r, 1200));
 
-      const [state, indicators, quote] = await Promise.all([
+      const [state, studyValues, quote, dashboard] = await Promise.all([
         chart.getState(),
         data.getStudyValues(),
         data.getQuote({}),
+        dashboardEntityId
+          ? data.getPineTables({ study_filter: dashboardFilter })
+          : Promise.resolve(null),
       ]);
 
       results.push({
         symbol,
         timeframe: default_timeframe,
         state,
-        indicators,
+        indicators: studyValues,
         quote,
+        dashboard,
       });
     } catch (err) {
       results.push({ symbol, error: err.message });
@@ -94,6 +122,14 @@ export async function runBrief({ rules_path } = {}) {
         await chart.setTimeframe({ timeframe: originalTimeframe });
     } catch (_) {}
   }
+  if (dashboardEntityId && dashboardWasVisible === false) {
+    try {
+      await indicators.toggleVisibility({
+        entity_id: dashboardEntityId,
+        visible: false,
+      });
+    } catch (_) {}
+  }
 
   return {
     success: true,
@@ -106,7 +142,7 @@ export async function runBrief({ rules_path } = {}) {
     },
     symbols_scanned: results,
     instruction: [
-      "For each symbol in symbols_scanned, apply the bias_criteria from rules to the indicator readings.",
+      "For each symbol in symbols_scanned, use its dashboard table (Bias/Trend/Signal/Confidence/Pressure/Delta/Sweep/Liquidity, if present) together with the indicator readings to apply the bias_criteria and risk_rules from rules.",
       "Output one line per symbol: SYMBOL | BIAS: [bullish/bearish/neutral] | KEY LEVEL: [price] | WATCH: [what to monitor]",
       "End with a one-sentence overall market read.",
       "Be direct. No preamble.",
