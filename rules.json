@@ -1,31 +1,39 @@
 {
-  "watchlist": ["BTCUSD", "ETHUSD", "SOLUSD", "LINKUSDT", "HYPEUSDT", "AVAXUSDT", "ONDOUSDT", "TSLA", "MSTR", "NVDA", "MARA", "AMD", "ALAB", "CLSK", "SOFI" ,"HIMS". "NVTS", "NDA", "HODL", "ASST", "TTD", "SYM", "BBAI"],
-  "default_timeframe": "240",
+  "watchlist": ["MNQ1!", "MGC1!", "MES1!"],
+  "default_timeframe": "15",
 
   "bias_criteria": {
     "bullish": [
-      "Ribbon direction is up (bullish colour)",
-      "Price is above the 20 EMA on the 4H",
-      "RSI is below 60 (room to run)"
+      "EMA9 above EMA21 and price above session VWAP (trendBias = +1, no conflict)",
+      "Dashboard Signal Type reads \"Bullish Continuation\" or \"Bullish Reversal\"",
+      "Confidence gauge at or above Minimum Bayesian Confidence (60% default)",
+      "Bull Score trending toward Grade A (>= 8) or better"
     ],
     "bearish": [
-      "Ribbon direction is down (bearish colour)",
-      "Price is below the 20 EMA on the 4H",
-      "RSI is above 40 (room to drop)"
+      "EMA9 below EMA21 and price below session VWAP (trendBias = -1, no conflict)",
+      "Dashboard Signal Type reads \"Bearish Continuation\" or \"Bearish Reversal\"",
+      "Confidence gauge at or above Minimum Bayesian Confidence (60% default)",
+      "Bear Score trending toward Grade A (>= 8) or better"
     ],
     "neutral": [
-      "Ribbon is flat or mixed",
-      "Price is chopping around the 20 EMA",
-      "RSI is between 45 and 55"
+      "EMA9/EMA21 and VWAP disagree, or trendBias = 0",
+      "Dashboard Signal Type reads \"Range / No Edge\"",
+      "Bull Score and Bear Score within 1-2 points, neither reaching Grade B (6)"
     ]
   },
 
   "risk_rules": [
-    "Only take trades where R:R is at least 1:2",
-    "No trading in the first 15 minutes of the NY session open",
-    "Maximum 2 open positions at once",
-    "If I have 2 losing trades in a row, stop for the day"
+    "Only take signals that pass the indicator's hard gates: bullScore/bearScore >= 9 and Bayesian confidence >= 60%",
+    "Only take trades with R:R >= 1:2, as enforced by the minRR input",
+    "Risk 1% of starting equity ($250) per trade based on the stopBuffer-derived stop distance",
+    "Cap total open risk at 2% of starting equity ($500), well inside the $1,000 Max Loss Limit",
+    "No new entries in the first 15 minutes of an active ORB window (08:00, 03:00, 19:00 EST)",
+    "Maximum 2 open positions at once, never duplicated on the same symbol",
+    "Two losing trades in a row stops trading for the remainder of the session",
+    "Flatten all positions by 4:30 PM EST, 15 minutes ahead of Lucid's 4:45 PM EST mandatory close",
+    "No martingaling - every trade sized identically off the 1% rule regardless of prior outcome",
+    "Treat the EOD trailing Max Loss Limit as breachable intraday - keep $200 of daily buffer beneath it"
   ],
 
-  "notes": "Add any other context you want Claude to factor in — e.g. macro events this week, key dates, anything that should affect your bias."
+  "notes": "Apex Predator Master v2.0.0-alpha.7. Watchlist and timeframe fixed per original basis. Lucid $25,000 LucidPro/LucidFlex figures (Max Loss Limit $1,000, evaluation target $1,250/5%, 2-mini/20-micro position cap) verified via support lucidtrading.com on 2026-07-19 -re-verify before live use. Re-check macro calendar (CPI, FOMC, NFP) each day and stand aside from NQ/ES/GC signals during high-impact releases even if the indicator qualifies a trade."
 }
